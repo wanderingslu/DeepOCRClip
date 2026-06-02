@@ -2,7 +2,7 @@ import Carbon
 import Foundation
 
 final class HotKeyManager {
-    typealias Handler = @MainActor @Sendable (CaptureMode) -> Void
+    typealias Handler = @MainActor @Sendable (HotKeyAction) -> Void
 
     private var handler: Handler?
     private var hotKeyRefs: [EventHotKeyRef] = []
@@ -43,10 +43,20 @@ final class HotKeyManager {
             &eventHandlerRef
         )
 
-        let modifiers = UInt32(optionKey | shiftKey)
-        registerHotKey(keyCode: 8, modifiers: modifiers, id: 1)   // C
-        registerHotKey(keyCode: 9, modifiers: modifiers, id: 2)   // V
-        registerHotKey(keyCode: 17, modifiers: modifiers, id: 3)  // T
+        reloadHotKeys(
+            capture: SettingsStore.shared.captureHotKey,
+            showLastResult: SettingsStore.shared.showLastHotKey
+        )
+    }
+
+    func reloadHotKeys(capture: HotKeySetting, showLastResult: HotKeySetting) {
+        hotKeyRefs.forEach { UnregisterEventHotKey($0) }
+        hotKeyRefs.removeAll()
+
+        registerHotKey(setting: capture, action: .capture)
+        if showLastResult != capture {
+            registerHotKey(setting: showLastResult, action: .showLastResult)
+        }
     }
 
     deinit {
@@ -56,12 +66,12 @@ final class HotKeyManager {
         }
     }
 
-    private func registerHotKey(keyCode: UInt32, modifiers: UInt32, id: UInt32) {
+    private func registerHotKey(setting: HotKeySetting, action: HotKeyAction) {
         var hotKeyRef: EventHotKeyRef?
-        let hotKeyID = EventHotKeyID(signature: signature, id: id)
+        let hotKeyID = EventHotKeyID(signature: signature, id: action.rawValue)
         let status = RegisterEventHotKey(
-            keyCode,
-            modifiers,
+            setting.keyCode,
+            setting.modifiers,
             hotKeyID,
             GetApplicationEventTarget(),
             0,
@@ -74,21 +84,9 @@ final class HotKeyManager {
     }
 
     private func handleHotKey(id: UInt32) {
-        let mode: CaptureMode?
-        switch id {
-        case 1:
-            mode = .copy
-        case 2:
-            mode = .paste
-        case 3:
-            mode = .translate
-        default:
-            mode = nil
-        }
-
-        guard let mode else { return }
+        guard let action = HotKeyAction(rawValue: id) else { return }
         Task { @MainActor [handler] in
-            handler?(mode)
+            handler?(action)
         }
     }
 

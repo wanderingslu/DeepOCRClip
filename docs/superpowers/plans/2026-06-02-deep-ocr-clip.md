@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a native macOS menu bar OCR app that captures a screen region, recognizes text, repairs it with DeepSeek V4, copies it, optionally pastes it, and offers a CamScanner-style result window with copy and translation.
+**Goal:** Build a native macOS menu bar OCR app that captures a screen region, recognizes text, repairs it with DeepSeek V4, copies it, and offers a CamScanner-style result window with copy and translation.
 
 **Architecture:** The app is a Swift Package executable packaged into a `.app` bundle. AppKit owns the menu bar app, result window, and settings window; focused services handle capture, OCR, DeepSeek calls, clipboard, paste simulation, and global hotkeys.
 
@@ -41,7 +41,7 @@ Expected: SwiftPM recognizes one executable target named `DeepOCRClip`.
 
 - [x] **Step 1: Define capture modes and recognition result model**
 
-Add `CaptureMode`, `RecognitionResult`, and user-facing error types.
+Add `RecognitionResult` and user-facing error types.
 
 - [x] **Step 2: Implement settings persistence**
 
@@ -54,7 +54,6 @@ Use `UserDefaults` keys for API key, model, correction enabled, auto-paste, and 
 - Create: `Sources/DeepOCRClip/OCRService.swift`
 - Create: `Sources/DeepOCRClip/DeepSeekClient.swift`
 - Create: `Sources/DeepOCRClip/ClipboardService.swift`
-- Create: `Sources/DeepOCRClip/PasteService.swift`
 
 - [x] **Step 1: Implement interactive screen capture**
 
@@ -68,9 +67,9 @@ Use `VNRecognizeTextRequest` with accurate recognition and language correction, 
 
 Post OpenAI-compatible chat completion requests to `https://api.deepseek.com/chat/completions` using model `deepseek-v4-flash` by default.
 
-- [x] **Step 4: Implement clipboard and paste services**
+- [x] **Step 4: Implement clipboard service**
 
-Copy plain text with `NSPasteboard`; request Accessibility permission and post synthetic `Cmd+V` for auto-paste.
+Copy plain text with `NSPasteboard`.
 
 ### Task 4: Menu Bar, Hotkeys, Result Window, Settings Window
 
@@ -87,7 +86,7 @@ Create an accessory app with an `OCR` status item and menu actions for capture/c
 
 - [x] **Step 2: Implement global hotkeys**
 
-Register `Option+Shift+C`, `Option+Shift+V`, and `Option+Shift+T`.
+Register customizable default hotkeys: `Option+Shift+C` for capture and `Option+Shift+L` for the last result window.
 
 - [x] **Step 3: Implement result window**
 
@@ -99,7 +98,7 @@ Create API key, model, correction, auto-paste, and result-window controls.
 
 - [x] **Step 5: Wire workflow orchestration**
 
-Capture image, OCR it, optionally correct or translate with DeepSeek, copy result, optionally paste, and then show/update the result window.
+Capture image, OCR it, optionally correct with DeepSeek, copy result, and then show/update the result window. Translation runs from the result window button.
 
 ### Task 5: Build And Smoke Verification
 
@@ -128,4 +127,4 @@ Expected: menu bar item appears. Screen capture and Accessibility permissions ma
 
 - Spec coverage: all first-version scope items map to tasks above.
 - Placeholder scan: no `TBD` or vague implementation placeholders remain.
-- Type consistency: `CaptureMode`, `RecognitionResult`, service names, and settings keys are consistent across tasks.
+- Type consistency: `RecognitionResult`, service names, and settings keys are consistent across tasks.

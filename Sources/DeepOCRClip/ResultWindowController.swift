@@ -36,7 +36,7 @@ final class ResultWindowController: NSWindowController {
         currentResult = result
         showingTranslation = result.translatedText != nil
         imageView.image = NSImage(contentsOf: result.imageURL)
-        textView.string = result.visibleText
+        setDisplayedText(result.visibleText)
         setStatus(status, isError: false)
         updateTranslateButton()
 
@@ -62,7 +62,7 @@ final class ResultWindowController: NSWindowController {
         result.translatedText = translation
         currentResult = result
         showingTranslation = true
-        textView.string = translation
+        setDisplayedText(translation)
         updateTranslateButton()
         setStatus("翻译完成，已显示中文译文", isError: false)
     }
@@ -91,20 +91,21 @@ final class ResultWindowController: NSWindowController {
         let rightPane = NSView()
         rightPane.translatesAutoresizingMaskIntoConstraints = false
         rightPane.wantsLayer = true
-        rightPane.layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
+        rightPane.layer?.backgroundColor = NSColor.white.cgColor
 
         textView.isEditable = true
         textView.isRichText = false
         textView.allowsUndo = true
         textView.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
-        textView.textColor = NSColor.labelColor
-        textView.backgroundColor = NSColor.textBackgroundColor
+        textView.textColor = NSColor.black
+        textView.backgroundColor = NSColor.white
         textView.textContainerInset = NSSize(width: 26, height: 26)
 
         let textScroll = NSScrollView()
         textScroll.translatesAutoresizingMaskIntoConstraints = false
         textScroll.hasVerticalScroller = true
-        textScroll.drawsBackground = false
+        textScroll.drawsBackground = true
+        textScroll.backgroundColor = NSColor.white
         textScroll.documentView = textView
 
         let buttonBar = NSStackView()
@@ -198,7 +199,7 @@ final class ResultWindowController: NSWindowController {
 
         if showingTranslation, let currentResult {
             showingTranslation = false
-            textView.string = currentResult.correctedText
+            setDisplayedText(currentResult.correctedText)
             updateTranslateButton()
             setStatus("已切回识别原文", isError: false)
             return
@@ -212,5 +213,20 @@ final class ResultWindowController: NSWindowController {
 
         setTranslating(true)
         onTranslate?(sourceText)
+    }
+
+    private func setDisplayedText(_ text: String) {
+        textView.string = text
+        let fullRange = NSRange(location: 0, length: (text as NSString).length)
+        if fullRange.length > 0 {
+            textView.textStorage?.addAttributes([
+                .foregroundColor: NSColor.black,
+                .font: NSFont.systemFont(ofSize: 20, weight: .semibold)
+            ], range: fullRange)
+        }
+        textView.typingAttributes = [
+            .foregroundColor: NSColor.black,
+            .font: NSFont.systemFont(ofSize: 20, weight: .semibold)
+        ]
     }
 }

@@ -1,11 +1,5 @@
 import Foundation
 
-enum CaptureMode {
-    case copy
-    case paste
-    case translate
-}
-
 struct RecognitionResult {
     let id: UUID
     let imageURL: URL

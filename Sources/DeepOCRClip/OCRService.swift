@@ -10,9 +10,19 @@ final class OCRService: @unchecked Sendable {
         }
 
         let request = VNRecognizeTextRequest()
+        request.revision = VNRecognizeTextRequest.currentRevision
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
-        request.recognitionLanguages = ["en-US", "zh-Hans", "zh-Hant"]
+
+        let preferredLanguages = ["zh-Hans", "zh-Hant", "en-US"]
+        if let supportedLanguages = try? request.supportedRecognitionLanguages() {
+            let supportedPreferredLanguages = preferredLanguages.filter { supportedLanguages.contains($0) }
+            if !supportedPreferredLanguages.isEmpty {
+                request.recognitionLanguages = supportedPreferredLanguages
+            }
+        } else {
+            request.recognitionLanguages = preferredLanguages
+        }
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         try handler.perform([request])
