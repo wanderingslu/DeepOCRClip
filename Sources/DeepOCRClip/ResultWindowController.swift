@@ -4,7 +4,7 @@ final class ResultWindowController: NSWindowController {
     var onTranslate: ((String) -> Void)?
 
     private let imageView = NSImageView()
-    private let textView = NSTextView()
+    private let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 560, height: 640))
     private let statusLabel = NSTextField(labelWithString: "准备就绪")
     private let copyButton = NSButton(title: "复制", target: nil, action: nil)
     private let translateButton = NSButton(title: "翻译", target: nil, action: nil)
@@ -22,6 +22,8 @@ final class ResultWindowController: NSWindowController {
             defer: false
         )
         window.title = "识别结果"
+        window.appearance = NSAppearance(named: .aqua)
+        window.backgroundColor = NSColor.white
         window.minSize = NSSize(width: 860, height: 520)
         window.isReleasedWhenClosed = false
         super.init(window: window)
@@ -85,6 +87,7 @@ final class ResultWindowController: NSWindowController {
 
     private func buildContentView() -> NSView {
         let root = NSView()
+        root.appearance = NSAppearance(named: .aqua)
         root.wantsLayer = true
         root.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
@@ -112,16 +115,32 @@ final class ResultWindowController: NSWindowController {
         textView.isEditable = true
         textView.isRichText = false
         textView.allowsUndo = true
+        textView.importsGraphics = false
+        textView.drawsBackground = true
         textView.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
         textView.textColor = NSColor.black
         textView.backgroundColor = NSColor.white
+        textView.insertionPointColor = NSColor.black
+        textView.appearance = NSAppearance(named: .aqua)
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
         textView.textContainerInset = NSSize(width: 26, height: 26)
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: 560, height: CGFloat.greatestFiniteMagnitude)
+        textView.selectedTextAttributes = [
+            .foregroundColor: NSColor.white,
+            .backgroundColor: NSColor.systemBlue
+        ]
 
         let textScroll = NSScrollView()
         textScroll.translatesAutoresizingMaskIntoConstraints = false
         textScroll.hasVerticalScroller = true
         textScroll.drawsBackground = true
         textScroll.backgroundColor = NSColor.white
+        textScroll.contentView.backgroundColor = NSColor.white
         textScroll.documentView = textView
 
         let buttonBar = NSStackView()
@@ -250,17 +269,24 @@ final class ResultWindowController: NSWindowController {
     }
 
     private func setDisplayedText(_ text: String) {
-        textView.string = text
-        let fullRange = NSRange(location: 0, length: (text as NSString).length)
-        if fullRange.length > 0 {
-            textView.textStorage?.addAttributes([
-                .foregroundColor: NSColor.black,
-                .font: NSFont.systemFont(ofSize: 20, weight: .semibold)
-            ], range: fullRange)
-        }
+        let attributes: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor.black,
+            .font: NSFont.systemFont(ofSize: 20, weight: .semibold),
+            .backgroundColor: NSColor.white
+        ]
+        textView.textStorage?.setAttributedString(NSAttributedString(string: text, attributes: attributes))
         textView.typingAttributes = [
             .foregroundColor: NSColor.black,
-            .font: NSFont.systemFont(ofSize: 20, weight: .semibold)
+            .font: NSFont.systemFont(ofSize: 20, weight: .semibold),
+            .backgroundColor: NSColor.white
         ]
+        textView.textColor = NSColor.black
+        textView.backgroundColor = NSColor.white
+        textView.needsDisplay = true
+        textView.layoutManager?.ensureLayout(for: textView.textContainer!)
+        let usedHeight = textView.layoutManager?.usedRect(for: textView.textContainer!).height ?? 0
+        textView.enclosingScrollView?.documentView?.setFrameSize(
+            NSSize(width: textView.enclosingScrollView?.contentSize.width ?? 560, height: max(usedHeight + 80, 640))
+        )
     }
 }
