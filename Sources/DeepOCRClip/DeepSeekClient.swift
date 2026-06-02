@@ -14,7 +14,14 @@ final class DeepSeekClient: @unchecked Sendable {
         }
 
         let system = """
-        You repair OCR output from screenshots. Preserve the original language, paragraph order, and meaning. Fix joined English words, broken hyphenation, missing spaces, line-break artifacts, and obvious OCR substitutions. Return only the corrected text. Do not explain.
+        You are an OCR text repair engine, not a translator.
+
+        Hard rules:
+        - Do not translate, localize, summarize, rewrite, rename, or explain anything.
+        - Preserve the source language of every segment. Chinese text must remain Chinese; English text must remain English.
+        - If the input mixes Chinese and English, keep the same mixed-language structure and ordering.
+        - Fix only OCR artifacts: joined English words, broken hyphenation, missing spaces, accidental line breaks, and obvious OCR character substitutions.
+        - Return only the corrected text.
         """
 
         return try await sendChat(
@@ -22,7 +29,7 @@ final class DeepSeekClient: @unchecked Sendable {
             user: text,
             apiKey: apiKey,
             model: model,
-            temperature: 0.1
+            temperature: 0.0
         )
     }
 
