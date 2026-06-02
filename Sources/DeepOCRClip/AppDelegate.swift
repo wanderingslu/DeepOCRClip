@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isBusy = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DiagnosticsLogger.log("application launched")
         NSApp.setActivationPolicy(.accessory)
         configureStatusItem()
         configureResultWindowCallbacks()
@@ -90,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setStatus(_ status: AppStatus) {
+        DiagnosticsLogger.log("status: \(status.message)")
         statusMenuItem.title = status.message
         statusItem?.button?.toolTip = status.message
     }
@@ -138,70 +140,124 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let showResultWindow = settings.showResultWindow
 
         Task(priority: .userInitiated) {
+            var capturedImageURL: URL?
             do {
                 let imageURL = try await captureService.captureInteractiveRegion()
+                capturedImageURL = imageURL
+                DiagnosticsLogger.log("capture completed: \(imageURL.path)")
                 await MainActor.run { self.setStatus(.info("正在识别文字...")) }
 
                 let rawText = try await ocrService.recognizeText(from: imageURL)
-                var correctedText = rawText
-                var statusMessage = "已复制识别结果"
-
-                if correctionEnabled {
-                    await MainActor.run { self.setStatus(.info("正在调用 DeepSeek 修正...")) }
-                    do {
-                        correctedText = try await deepSeekClient.correctOCRText(rawText, apiKey: apiKey, model: model)
-                    } catch AppError.missingAPIKey {
-                        statusMessage = "未配置 API Key，已复制本地 OCR 原文"
-                    } catch {
-                        statusMessage = "DeepSeek 修正失败，已复制本地 OCR 原文"
-                    }
-                }
+                DiagnosticsLogger.log("ocr completed: \(rawText.count) chars")
 
                 let result = RecognitionResult(
                     id: UUID(),
                     imageURL: imageURL,
                     rawText: rawText,
-                    correctedText: correctedText,
+                    correctedText: rawText,
                     translatedText: nil,
                     createdAt: Date()
                 )
 
                 await MainActor.run {
-                    self.finishCapture(
+                    self.showInitialResult(
                         result: result,
-                        statusMessage: statusMessage,
-                        showResultWindow: showResultWindow
+                        statusMessage: correctionEnabled && !apiKey.isEmpty ? "已复制本地 OCR，正在 DeepSeek 修正..." : "已复制识别结果",
+                        showResultWindow: showResultWindow,
+                        keepBusy: correctionEnabled && !apiKey.isEmpty
                     )
                 }
+
+                guard correctionEnabled else {
+                    await MainActor.run { self.isBusy = false }
+                    return
+                }
+
+                guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    await MainActor.run {
+                        self.isBusy = false
+                        self.setStatus(.info("未配置 API Key，已复制本地 OCR 原文"))
+                        self.resultWindowController.setStatus("未配置 API Key，已显示本地 OCR 原文", isError: false)
+                    }
+                    return
+                }
+
+                do {
+                    let correctedText = try await deepSeekClient.correctOCRText(rawText, apiKey: apiKey, model: model)
+                    DiagnosticsLogger.log("deepseek correction completed: \(correctedText.count) chars")
+                    let correctedResult = RecognitionResult(
+                        id: result.id,
+                        imageURL: result.imageURL,
+                        rawText: result.rawText,
+                        correctedText: correctedText,
+                        translatedText: result.translatedText,
+                        createdAt: result.createdAt
+                    )
+                    await MainActor.run {
+                        self.updateCorrectedResult(correctedResult, statusMessage: "DeepSeek 修正完成，已复制修正结果")
+                    }
+                } catch {
+                    DiagnosticsLogger.log("deepseek correction failed: \(error.localizedDescription)")
+                    await MainActor.run {
+                        self.isBusy = false
+                        self.setStatus(.error("DeepSeek 修正失败，已保留本地 OCR"))
+                        self.resultWindowController.setStatus("DeepSeek 修正失败，已保留本地 OCR", isError: true)
+                    }
+                }
             } catch {
+                DiagnosticsLogger.log("capture workflow failed: \(error.localizedDescription)")
                 await MainActor.run {
                     self.isBusy = false
-                    self.handleFailure(error)
+                    self.handleFailure(error, imageURL: capturedImageURL, showResultWindow: showResultWindow)
                 }
             }
         }
     }
 
-    private func finishCapture(
+    private func showInitialResult(
         result: RecognitionResult,
         statusMessage: String,
-        showResultWindow: Bool
+        showResultWindow: Bool,
+        keepBusy: Bool
     ) {
         lastResult = result
         ClipboardService.copy(result.visibleText)
         setStatus(.info(statusMessage))
-        isBusy = false
+        isBusy = keepBusy
 
         guard showResultWindow else { return }
         resultWindowController.show(result: result, status: statusMessage)
     }
 
-    private func handleFailure(_ error: Error) {
+    private func updateCorrectedResult(_ result: RecognitionResult, statusMessage: String) {
+        lastResult = result
+        ClipboardService.copy(result.visibleText)
+        setStatus(.info(statusMessage))
+        isBusy = false
+        resultWindowController.update(result: result, status: statusMessage)
+    }
+
+    private func handleFailure(_ error: Error, imageURL: URL?, showResultWindow: Bool) {
+        let message: String
         if let appError = error as? AppError {
-            setStatus(.error(appError.localizedDescription))
-            return
+            message = appError.localizedDescription
+        } else {
+            message = error.localizedDescription
         }
-        setStatus(.error(error.localizedDescription))
+        setStatus(.error(message))
+
+        guard let imageURL, showResultWindow else { return }
+        let result = RecognitionResult(
+            id: UUID(),
+            imageURL: imageURL,
+            rawText: "",
+            correctedText: message,
+            translatedText: nil,
+            createdAt: Date()
+        )
+        lastResult = result
+        resultWindowController.show(result: result, status: message)
+        resultWindowController.setStatus(message, isError: true)
     }
 
     private func translateTextFromResultWindow(_ sourceText: String) {
@@ -218,6 +274,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task(priority: .userInitiated) {
             do {
                 let translation = try await deepSeekClient.translateToChinese(sourceText, apiKey: apiKey, model: model)
+                DiagnosticsLogger.log("translation completed: \(translation.count) chars")
                 await MainActor.run {
                     self.resultWindowController.setTranslating(false)
                     self.resultWindowController.applyTranslation(translation)
@@ -225,6 +282,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.setStatus(.info("翻译完成，已复制中文"))
                 }
             } catch {
+                DiagnosticsLogger.log("translation failed: \(error.localizedDescription)")
                 await MainActor.run {
                     self.resultWindowController.setTranslating(false)
                     self.resultWindowController.setStatus(error.localizedDescription, isError: true)

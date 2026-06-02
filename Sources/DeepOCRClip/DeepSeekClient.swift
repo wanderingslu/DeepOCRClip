@@ -47,7 +47,7 @@ final class DeepSeekClient: @unchecked Sendable {
     private func sendChat(system: String, user: String, apiKey: String, model: String, temperature: Double) async throws -> String {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
-        request.timeoutInterval = 90
+        request.timeoutInterval = 25
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 

@@ -1,11 +1,12 @@
-import AppKit
+import CoreGraphics
 import Foundation
+import ImageIO
 import Vision
 
 final class OCRService: @unchecked Sendable {
     func recognizeText(from imageURL: URL) async throws -> String {
-        guard let image = NSImage(contentsOf: imageURL),
-              let cgImage = image.deepOCRClipCGImage else {
+        guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
             throw AppError.imageLoadFailed
         }
 
@@ -44,12 +45,5 @@ final class OCRService: @unchecked Sendable {
             throw AppError.noTextFound
         }
         return text
-    }
-}
-
-private extension NSImage {
-    var deepOCRClipCGImage: CGImage? {
-        var rect = CGRect(origin: .zero, size: size)
-        return cgImage(forProposedRect: &rect, context: nil, hints: nil)
     }
 }

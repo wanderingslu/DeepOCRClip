@@ -46,6 +46,14 @@ final class ResultWindowController: NSWindowController {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func update(result: RecognitionResult, status: String, isError: Bool = false) {
+        currentResult = result
+        showingTranslation = result.translatedText != nil
+        setDisplayedText(result.visibleText)
+        setStatus(status, isError: isError)
+        updateTranslateButton()
+    }
+
     func setStatus(_ message: String, isError: Bool) {
         statusLabel.stringValue = message
         statusLabel.textColor = isError ? NSColor.systemRed : NSColor.secondaryLabelColor

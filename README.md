@@ -20,6 +20,14 @@ swift build
 
 The packaged app is written to `.build/DeepOCRClip.app`.
 
+Until LaunchServices packaging is fixed, use the direct launcher:
+
+```bash
+./scripts/run_app.sh
+```
+
+Diagnostics are written to `~/Library/Logs/DeepOCRClip.log`.
+
 ## Notes
 
 - Configure the DeepSeek API key from the app's settings menu.
