@@ -16,6 +16,7 @@ struct RecognitionResult {
 enum AppError: LocalizedError {
     case captureCancelled
     case captureFailed(String)
+    case screenCapturePermissionDenied
     case imageLoadFailed
     case noTextFound
     case missingAPIKey
@@ -28,6 +29,8 @@ enum AppError: LocalizedError {
             return "已取消截图"
         case .captureFailed(let reason):
             return "截图失败：\(reason)"
+        case .screenCapturePermissionDenied:
+            return "需要授予屏幕录制权限后才能截图。授权后请重新启动 DeepOCRClip。"
         case .imageLoadFailed:
             return "无法读取截图图片"
         case .noTextFound:

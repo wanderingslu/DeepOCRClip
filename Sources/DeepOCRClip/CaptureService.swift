@@ -1,7 +1,21 @@
+import CoreGraphics
 import Foundation
 
 final class CaptureService: @unchecked Sendable {
+    func hasScreenCaptureAccess() -> Bool {
+        CGPreflightScreenCaptureAccess()
+    }
+
+    @discardableResult
+    func requestScreenCaptureAccess() -> Bool {
+        CGRequestScreenCaptureAccess()
+    }
+
     func captureInteractiveRegion() async throws -> URL {
+        guard hasScreenCaptureAccess() else {
+            throw AppError.screenCapturePermissionDenied
+        }
+
         let outputURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("DeepOCRClip-\(UUID().uuidString)")
             .appendingPathExtension("png")

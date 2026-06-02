@@ -12,6 +12,7 @@ final class ResultWindowController: NSWindowController {
     private var currentResult: RecognitionResult?
     private var showingTranslation = false
     private var isTranslating = false
+    private var keyMonitor: Any?
 
     init() {
         let window = NSWindow(
@@ -26,10 +27,17 @@ final class ResultWindowController: NSWindowController {
         super.init(window: window)
         window.contentView = buildContentView()
         configureControls()
+        installCloseShortcut()
     }
 
     required init?(coder: NSCoder) {
         nil
+    }
+
+    deinit {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+        }
     }
 
     func show(result: RecognitionResult, status: String) {
@@ -190,6 +198,24 @@ final class ResultWindowController: NSWindowController {
         translateButton.contentTintColor = NSColor.controlTextColor
         translateButton.wantsLayer = true
         translateButton.layer?.cornerRadius = 7
+    }
+
+    private func installCloseShortcut() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self,
+                  self.window?.isKeyWindow == true else {
+                return event
+            }
+
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if flags == .command,
+               event.charactersIgnoringModifiers?.lowercased() == "w" {
+                self.window?.performClose(nil)
+                return nil
+            }
+
+            return event
+        }
     }
 
     private func updateTranslateButton() {

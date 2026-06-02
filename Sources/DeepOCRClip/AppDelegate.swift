@@ -131,6 +131,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        guard captureService.hasScreenCaptureAccess() else {
+            DiagnosticsLogger.log("screen capture permission missing")
+            setStatus(.error(AppError.screenCapturePermissionDenied.localizedDescription))
+            captureService.requestScreenCaptureAccess()
+            presentScreenCapturePermissionAlert()
+            return
+        }
+
         isBusy = true
         setStatus(.info("选择截图区域..."))
 
@@ -241,6 +249,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let message: String
         if let appError = error as? AppError {
             message = appError.localizedDescription
+            if case .screenCapturePermissionDenied = appError {
+                presentScreenCapturePermissionAlert()
+            }
         } else {
             message = error.localizedDescription
         }
@@ -258,6 +269,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastResult = result
         resultWindowController.show(result: result, status: message)
         resultWindowController.setStatus(message, isError: true)
+    }
+
+    private func presentScreenCapturePermissionAlert() {
+        let alert = NSAlert()
+        alert.messageText = "DeepOCRClip 需要屏幕录制权限"
+        alert.informativeText = "当前截图只能拿到桌面背景，无法读取窗口内容。请在系统设置中允许 DeepOCRClip 屏幕录制权限，然后退出并重新启动 DeepOCRClip。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "打开系统设置")
+        alert.addButton(withTitle: "稍后")
+
+        if alert.runModal() == .alertFirstButtonReturn,
+           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func translateTextFromResultWindow(_ sourceText: String) {
