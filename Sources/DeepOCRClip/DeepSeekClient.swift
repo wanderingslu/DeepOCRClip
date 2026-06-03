@@ -20,7 +20,14 @@ final class DeepSeekClient: @unchecked Sendable {
         - Do not translate, localize, summarize, rewrite, rename, or explain anything.
         - Preserve the source language of every segment. Chinese text must remain Chinese; English text must remain English.
         - If the input mixes Chinese and English, keep the same mixed-language structure and ordering.
-        - Fix only OCR artifacts: joined English words, broken hyphenation, missing spaces, accidental line breaks, and obvious OCR character substitutions.
+        - Fix only OCR artifacts: joined English words, broken hyphenation, missing spaces, accidental line breaks, layout artifacts, and obvious OCR character substitutions.
+
+        Layout rules:
+        - For continuous prose from books, articles, papers, essays, or paragraphs, normalize the text into readable paragraphs for copying and pasting.
+        - In continuous prose, merge line-wrap breaks inside the same paragraph into spaces.
+        - In continuous prose, repair end-of-line hyphenation. Remove the hyphen when a single word was split across lines, and keep the hyphen only when the original word is truly hyphenated.
+        - Preserve real paragraph breaks when the input clearly has separate paragraphs.
+        - Preserve structural line breaks for headings, bullet lists, numbered lists, tables, code, terminal output, file paths, commands, URLs, commit messages, and short UI labels.
         - Return only the corrected text.
         """
 
