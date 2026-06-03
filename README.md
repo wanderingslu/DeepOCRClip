@@ -18,7 +18,7 @@ Both shortcuts can be changed in Settings. Translation is available from the `ç¿
 ./scripts/build_app.sh release
 ```
 
-The packaged app is written to `dist/DeepOCRClip.app`.
+The packaged universal app (`x86_64` + `arm64`) is written to `dist/DeepOCRClip.app`.
 
 ## Install
 
@@ -41,7 +41,7 @@ Diagnostics are written to `~/Library/Logs/DeepOCRClip.log`.
 ./scripts/build_dmg.sh
 ```
 
-The DMG is written to `dist/DeepOCRClip-<version>.dmg`.
+The DMG contains the universal app and is written to `dist/DeepOCRClip-<version>.dmg`.
 
 ## Notes
 

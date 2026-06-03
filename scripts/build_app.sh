@@ -12,30 +12,49 @@ case "$CONFIGURATION" in
         ;;
 esac
 
-if [[ "$CONFIGURATION" == "release" ]]; then
-    SWIFT_BUILD_ARGS=(-c release)
-    BINARY_PATH="$ROOT_DIR/.build/release/DeepOCRClip"
-else
-    SWIFT_BUILD_ARGS=()
-    BINARY_PATH="$ROOT_DIR/.build/debug/DeepOCRClip"
-fi
-
 APP_DIR="$ROOT_DIR/dist/DeepOCRClip.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 ICONSET_DIR="$ROOT_DIR/.build/AppIcon.iconset"
+BUILD_DIR="$ROOT_DIR/.build/deepocrclip-$CONFIGURATION"
 DEFAULT_SIGNING_IDENTITY="DeepOCRClip Local Code Signing"
 SIGNING_IDENTITY="${DEEP_OCR_CODESIGN_IDENTITY:-}"
 
 cd "$ROOT_DIR"
 
-swift build "${SWIFT_BUILD_ARGS[@]}"
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+
+SWIFTC_ARGS=(
+    -framework AppKit
+    -framework Vision
+    -framework Carbon
+    -framework ApplicationServices
+)
+
+if [[ "$CONFIGURATION" == "release" ]]; then
+    SWIFTC_ARGS=(-O "${SWIFTC_ARGS[@]}")
+fi
+
+for arch in x86_64 arm64; do
+    echo "Building $CONFIGURATION slice: $arch"
+    xcrun swiftc \
+        -target "$arch-apple-macosx13.0" \
+        "${SWIFTC_ARGS[@]}" \
+        "$ROOT_DIR"/Sources/DeepOCRClip/*.swift \
+        -o "$BUILD_DIR/DeepOCRClip-$arch"
+done
+
+lipo -create \
+    "$BUILD_DIR/DeepOCRClip-x86_64" \
+    "$BUILD_DIR/DeepOCRClip-arm64" \
+    -output "$BUILD_DIR/DeepOCRClip"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-cp "$BINARY_PATH" "$MACOS_DIR/DeepOCRClip"
+cp "$BUILD_DIR/DeepOCRClip" "$MACOS_DIR/DeepOCRClip"
 cp "$ROOT_DIR/Resources/Info.plist" "$CONTENTS_DIR/Info.plist"
 chmod +x "$MACOS_DIR/DeepOCRClip"
 
@@ -57,5 +76,6 @@ fi
 codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP_DIR" >/dev/null
 codesign --verify --deep --strict "$APP_DIR"
 plutil -lint "$CONTENTS_DIR/Info.plist" >/dev/null
+lipo "$MACOS_DIR/DeepOCRClip" -verify_arch x86_64 arm64
 
 echo "$APP_DIR"
