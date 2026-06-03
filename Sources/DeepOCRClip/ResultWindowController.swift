@@ -16,15 +16,15 @@ final class ResultWindowController: NSWindowController {
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 920, height: 560),
+            styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         window.title = "识别结果"
         window.appearance = NSAppearance(named: .aqua)
         window.backgroundColor = NSColor.white
-        window.minSize = NSSize(width: 860, height: 520)
+        window.isMovable = true
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.contentView = buildContentView()
@@ -50,8 +50,8 @@ final class ResultWindowController: NSWindowController {
         setStatus(status, isError: false)
         updateTranslateButton()
 
+        applyFixedWindowFrame()
         showWindow(nil)
-        window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -191,6 +191,32 @@ final class ResultWindowController: NSWindowController {
         ])
 
         return root
+    }
+
+    private func applyFixedWindowFrame() {
+        guard let window else { return }
+
+        let visibleFrame = (window.screen ?? NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let contentSize = fixedContentSize(for: visibleFrame)
+        let frameSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: contentSize)).size
+        let origin = NSPoint(
+            x: visibleFrame.midX - frameSize.width / 2,
+            y: visibleFrame.midY - frameSize.height / 2
+        )
+
+        window.setFrame(NSRect(origin: origin, size: frameSize), display: false)
+    }
+
+    private func fixedContentSize(for visibleFrame: NSRect) -> NSSize {
+        NSSize(
+            width: clamped(visibleFrame.width * 0.5, minimum: 760, maximum: 1040),
+            height: clamped(visibleFrame.height * 0.5, minimum: 500, maximum: 680)
+        )
+    }
+
+    private func clamped(_ value: CGFloat, minimum: CGFloat, maximum: CGFloat) -> CGFloat {
+        min(max(value.rounded(.down), minimum), maximum)
     }
 
     private func configureControls() {
