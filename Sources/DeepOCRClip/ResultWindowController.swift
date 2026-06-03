@@ -99,13 +99,7 @@ final class ResultWindowController: NSWindowController {
         imageView.translatesAutoresizingMaskIntoConstraints = false
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.imageAlignment = .alignCenter
-
-        let imageScroll = NSScrollView()
-        imageScroll.translatesAutoresizingMaskIntoConstraints = false
-        imageScroll.drawsBackground = false
-        imageScroll.hasVerticalScroller = true
-        imageScroll.hasHorizontalScroller = true
-        imageScroll.documentView = imageView
+        imageView.imageFrameStyle = .none
 
         let rightPane = NSView()
         rightPane.translatesAutoresizingMaskIntoConstraints = false
@@ -160,7 +154,7 @@ final class ResultWindowController: NSWindowController {
 
         root.addSubview(leftPane)
         root.addSubview(rightPane)
-        leftPane.addSubview(imageScroll)
+        leftPane.addSubview(imageView)
         rightPane.addSubview(textScroll)
         rightPane.addSubview(buttonBar)
 
@@ -175,13 +169,10 @@ final class ResultWindowController: NSWindowController {
             rightPane.topAnchor.constraint(equalTo: root.topAnchor),
             rightPane.bottomAnchor.constraint(equalTo: root.bottomAnchor),
 
-            imageScroll.leadingAnchor.constraint(equalTo: leftPane.leadingAnchor, constant: 24),
-            imageScroll.trailingAnchor.constraint(equalTo: leftPane.trailingAnchor, constant: -24),
-            imageScroll.topAnchor.constraint(equalTo: leftPane.topAnchor, constant: 24),
-            imageScroll.bottomAnchor.constraint(equalTo: leftPane.bottomAnchor, constant: -24),
-
-            imageView.widthAnchor.constraint(greaterThanOrEqualTo: imageScroll.contentView.widthAnchor),
-            imageView.heightAnchor.constraint(greaterThanOrEqualTo: imageScroll.contentView.heightAnchor),
+            imageView.leadingAnchor.constraint(equalTo: leftPane.leadingAnchor, constant: 24),
+            imageView.trailingAnchor.constraint(equalTo: leftPane.trailingAnchor, constant: -24),
+            imageView.topAnchor.constraint(equalTo: leftPane.topAnchor, constant: 24),
+            imageView.bottomAnchor.constraint(equalTo: leftPane.bottomAnchor, constant: -24),
 
             textScroll.leadingAnchor.constraint(equalTo: rightPane.leadingAnchor),
             textScroll.trailingAnchor.constraint(equalTo: rightPane.trailingAnchor),
