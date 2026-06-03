@@ -14,6 +14,7 @@ Both shortcuts can be changed in Settings. Translation is available from the `ç¿
 ## Build
 
 ```bash
+./scripts/create_signing_identity.sh
 ./scripts/build_app.sh release
 ```
 
@@ -47,3 +48,4 @@ The DMG is written to `dist/DeepOCRClip-<version>.dmg`.
 - Configure the DeepSeek API key from the app's settings menu.
 - Without an API key, local OCR still works and copies raw OCR text.
 - Screenshot capture requires macOS Screen Recording permission for `DeepOCRClip`.
+- For stable macOS permission behavior across rebuilds, run `./scripts/create_signing_identity.sh` once before packaging.

@@ -25,6 +25,8 @@ CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 ICONSET_DIR="$ROOT_DIR/.build/AppIcon.iconset"
+DEFAULT_SIGNING_IDENTITY="DeepOCRClip Local Code Signing"
+SIGNING_IDENTITY="${DEEP_OCR_CODESIGN_IDENTITY:-}"
 
 cd "$ROOT_DIR"
 
@@ -45,7 +47,14 @@ iconutil -c icns "$ICONSET_DIR" -o "$RESOURCES_DIR/AppIcon.icns"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.luruiyang.deepocrclip" "$CONTENTS_DIR/Info.plist" >/dev/null
 
 xattr -cr "$APP_DIR" 2>/dev/null || true
-codesign --force --deep --sign - "$APP_DIR" >/dev/null
+if [[ -z "$SIGNING_IDENTITY" ]] && security find-identity -v -p codesigning 2>/dev/null | grep -Fq "\"$DEFAULT_SIGNING_IDENTITY\""; then
+    SIGNING_IDENTITY="$DEFAULT_SIGNING_IDENTITY"
+fi
+if [[ -z "$SIGNING_IDENTITY" ]]; then
+    SIGNING_IDENTITY="-"
+fi
+
+codesign --force --deep --sign "$SIGNING_IDENTITY" "$APP_DIR" >/dev/null
 codesign --verify --deep --strict "$APP_DIR"
 plutil -lint "$CONTENTS_DIR/Info.plist" >/dev/null
 
