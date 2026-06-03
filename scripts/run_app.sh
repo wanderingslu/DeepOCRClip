@@ -2,11 +2,22 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_BIN="$ROOT_DIR/DeepOCRClip.app/Contents/MacOS/DeepOCRClip"
+APP_BIN=""
+for candidate in \
+    "/Applications/DeepOCRClip.app/Contents/MacOS/DeepOCRClip" \
+    "$ROOT_DIR/dist/DeepOCRClip.app/Contents/MacOS/DeepOCRClip" \
+    "$ROOT_DIR/.build/DeepOCRClip.app/Contents/MacOS/DeepOCRClip" \
+    "$ROOT_DIR/DeepOCRClip.app/Contents/MacOS/DeepOCRClip"
+do
+    if [[ -x "$candidate" ]]; then
+        APP_BIN="$candidate"
+        break
+    fi
+done
 STDOUT_LOG="/tmp/DeepOCRClip.stdout.log"
 
-if [[ ! -x "$APP_BIN" ]]; then
-    echo "DeepOCRClip executable not found: $APP_BIN" >&2
+if [[ -z "$APP_BIN" ]]; then
+    echo "DeepOCRClip executable not found. Run scripts/build_app.sh release first." >&2
     exit 1
 fi
 

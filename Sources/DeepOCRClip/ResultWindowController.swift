@@ -36,12 +36,6 @@ final class ResultWindowController: NSWindowController {
         nil
     }
 
-    deinit {
-        if let keyMonitor {
-            NSEvent.removeMonitor(keyMonitor)
-        }
-    }
-
     func show(result: RecognitionResult, status: String) {
         currentResult = result
         showingTranslation = result.translatedText != nil

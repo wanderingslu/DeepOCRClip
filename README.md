@@ -14,13 +14,19 @@ Both shortcuts can be changed in Settings. Translation is available from the `ç¿
 ## Build
 
 ```bash
-swift build
-./scripts/build_app.sh
+./scripts/build_app.sh release
 ```
 
-The packaged app is written to `.build/DeepOCRClip.app`.
+The packaged app is written to `dist/DeepOCRClip.app`.
 
-Until LaunchServices packaging is fixed, use the direct launcher:
+## Install
+
+```bash
+./scripts/install_app.sh
+```
+
+This builds a release app and installs it to `/Applications/DeepOCRClip.app`.
+You can then start it by double-clicking the app, or keep using the helper launcher:
 
 ```bash
 ./scripts/run_app.sh
@@ -32,4 +38,4 @@ Diagnostics are written to `~/Library/Logs/DeepOCRClip.log`.
 
 - Configure the DeepSeek API key from the app's settings menu.
 - Without an API key, local OCR still works and copies raw OCR text.
-- Screenshot capture may require macOS Screen Recording permission.
+- Screenshot capture requires macOS Screen Recording permission for `DeepOCRClip`.
