@@ -5,7 +5,7 @@ final class SettingsWindowController: NSWindowController {
     var onSave: (() -> Void)?
     var onHotKeyChange: (() -> Void)?
 
-    private let apiKeyField = NSSecureTextField()
+    private let apiKeyField = PasteEnabledSecureTextField()
     private let modelPopup = NSPopUpButton()
     private let correctionCheckbox = NSButton(checkboxWithTitle: "使用 DeepSeek 修正 OCR 结果", target: nil, action: nil)
     private let showResultCheckbox = NSButton(checkboxWithTitle: "识别完成后显示结果窗口", target: nil, action: nil)
@@ -154,5 +154,32 @@ final class SettingsWindowController: NSWindowController {
     private func setShortcutMessage(_ message: String, isError: Bool) {
         shortcutMessageLabel.stringValue = message
         shortcutMessageLabel.textColor = isError ? .systemRed : .secondaryLabelColor
+    }
+}
+
+private final class PasteEnabledSecureTextField: NSSecureTextField {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags == .command,
+              let key = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+
+        switch key {
+        case "v":
+            currentEditor()?.paste(nil)
+            return true
+        case "c":
+            currentEditor()?.copy(nil)
+            return true
+        case "x":
+            currentEditor()?.cut(nil)
+            return true
+        case "a":
+            currentEditor()?.selectAll(nil)
+            return true
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
     }
 }
