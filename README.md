@@ -34,6 +34,14 @@ You can then start it by double-clicking the app, or keep using the helper launc
 
 Diagnostics are written to `~/Library/Logs/DeepOCRClip.log`.
 
+## DMG
+
+```bash
+./scripts/build_dmg.sh
+```
+
+The DMG is written to `dist/DeepOCRClip-<version>.dmg`.
+
 ## Notes
 
 - Configure the DeepSeek API key from the app's settings menu.
