@@ -3,7 +3,7 @@ import AppKit
 final class ResultWindowController: NSWindowController {
     var onTranslate: ((String) -> Void)?
 
-    private let imageView = NSImageView()
+    private let imageView = AspectFitImageView()
     private let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 560, height: 640))
     private let statusLabel = NSTextField(labelWithString: "准备就绪")
     private let copyButton = NSButton(title: "复制", target: nil, action: nil)
@@ -50,8 +50,8 @@ final class ResultWindowController: NSWindowController {
         setStatus(status, isError: false)
         updateTranslateButton()
 
-        applyFixedWindowFrame()
         showWindow(nil)
+        applyFixedWindowFrame(display: true)
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -97,9 +97,7 @@ final class ResultWindowController: NSWindowController {
         leftPane.layer?.backgroundColor = NSColor(calibratedWhite: 0.955, alpha: 1).cgColor
 
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.imageAlignment = .alignCenter
-        imageView.imageFrameStyle = .none
+        imageView.wantsLayer = true
 
         let rightPane = NSView()
         rightPane.translatesAutoresizingMaskIntoConstraints = false
@@ -193,7 +191,7 @@ final class ResultWindowController: NSWindowController {
         return root
     }
 
-    private func applyFixedWindowFrame() {
+    private func applyFixedWindowFrame(display: Bool) {
         guard let window else { return }
 
         let visibleFrame = (window.screen ?? NSScreen.main ?? NSScreen.screens.first)?.visibleFrame
@@ -205,7 +203,11 @@ final class ResultWindowController: NSWindowController {
             y: visibleFrame.midY - frameSize.height / 2
         )
 
-        window.setFrame(NSRect(origin: origin, size: frameSize), display: false)
+        let frame = NSRect(origin: origin, size: frameSize)
+        DiagnosticsLogger.log(
+            "result window frame set: visible=\(Int(visibleFrame.width))x\(Int(visibleFrame.height)), content=\(Int(contentSize.width))x\(Int(contentSize.height)), frame=\(Int(frame.width))x\(Int(frame.height))"
+        )
+        window.setFrame(frame, display: display)
     }
 
     private func fixedContentSize(for visibleFrame: NSRect) -> NSSize {
@@ -305,5 +307,55 @@ final class ResultWindowController: NSWindowController {
         textView.enclosingScrollView?.documentView?.setFrameSize(
             NSSize(width: textView.enclosingScrollView?.contentSize.width ?? 560, height: max(usedHeight + 80, 640))
         )
+    }
+}
+
+private final class AspectFitImageView: NSView {
+    var image: NSImage? {
+        didSet {
+            needsDisplay = true
+        }
+    }
+
+    override var isFlipped: Bool {
+        true
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let image else { return }
+
+        let targetRect = aspectFitRect(imageSize: image.size, bounds: bounds)
+        image.draw(
+            in: targetRect,
+            from: NSRect(origin: .zero, size: image.size),
+            operation: .sourceOver,
+            fraction: 1,
+            respectFlipped: true,
+            hints: [.interpolation: NSImageInterpolation.high]
+        )
+    }
+
+    private func aspectFitRect(imageSize: NSSize, bounds: NSRect) -> NSRect {
+        guard imageSize.width > 0,
+              imageSize.height > 0,
+              bounds.width > 0,
+              bounds.height > 0 else {
+            return .zero
+        }
+
+        let scale = min(bounds.width / imageSize.width, bounds.height / imageSize.height)
+        let width = imageSize.width * scale
+        let height = imageSize.height * scale
+        return NSRect(
+            x: bounds.midX - width / 2,
+            y: bounds.midY - height / 2,
+            width: width,
+            height: height
+        ).integral
     }
 }
