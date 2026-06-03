@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let settings = SettingsStore.shared
     private let captureService = CaptureService()
     private let ocrService = OCRService()
@@ -12,6 +12,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var settingsWindowController = SettingsWindowController(settings: settings)
 
     private var statusItem: NSStatusItem?
+    private lazy var captureMenuItem: NSMenuItem = {
+        let item = NSMenuItem(title: "", action: #selector(captureAndCopy), keyEquivalent: "")
+        item.target = self
+        return item
+    }()
+    private lazy var showLastMenuItem: NSMenuItem = {
+        let item = NSMenuItem(title: "", action: #selector(showLastResult), keyEquivalent: "")
+        item.target = self
+        return item
+    }()
     private let statusMenuItem = NSMenuItem(title: "准备就绪", action: nil, keyEquivalent: "")
     private var lastResult: RecognitionResult?
     private var isBusy = false
@@ -46,18 +56,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func rebuildMenu() {
+        refreshMenuTitles()
+
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(
-            title: "截图识别并复制    \(settings.captureHotKey.displayString)",
-            action: #selector(captureAndCopy),
-            keyEquivalent: ""
-        ))
+        menu.delegate = self
+        menu.addItem(captureMenuItem)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(
-            title: "显示上次结果    \(settings.showLastHotKey.displayString)",
-            action: #selector(showLastResult),
-            keyEquivalent: ""
-        ))
+        menu.addItem(showLastMenuItem)
         menu.addItem(NSMenuItem(title: "设置...", action: #selector(openSettings), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(statusMenuItem)
@@ -72,6 +77,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = menu
     }
 
+    func menuWillOpen(_ menu: NSMenu) {
+        refreshMenuTitles()
+    }
+
+    private func refreshMenuTitles() {
+        captureMenuItem.title = "截图识别并复制    \(settings.captureHotKey.displayString)"
+        showLastMenuItem.title = "显示上次结果    \(settings.showLastHotKey.displayString)"
+    }
+
     private func configureResultWindowCallbacks() {
         resultWindowController.onTranslate = { [weak self] sourceText in
             self?.translateTextFromResultWindow(sourceText)
@@ -81,13 +95,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func configureSettingsCallbacks() {
         settingsWindowController.onSave = { [weak self] in
             guard let self else { return }
-            self.hotKeyManager.reloadHotKeys(
-                capture: self.settings.captureHotKey,
-                showLastResult: self.settings.showLastHotKey
-            )
-            self.rebuildMenu()
-            self.setStatus(.info("设置已保存"))
+            self.applyHotKeySettings(statusMessage: "设置已保存")
         }
+        settingsWindowController.onHotKeyChange = { [weak self] in
+            guard let self else { return }
+            self.applyHotKeySettings(statusMessage: "快捷键已更新")
+        }
+    }
+
+    private func applyHotKeySettings(statusMessage: String) {
+        hotKeyManager.reloadHotKeys(
+            capture: settings.captureHotKey,
+            showLastResult: settings.showLastHotKey
+        )
+        refreshMenuTitles()
+        setStatus(.info(statusMessage))
+        DiagnosticsLogger.log("hotkeys updated: capture=\(settings.captureHotKey.displayString), showLast=\(settings.showLastHotKey.displayString)")
     }
 
     private func setStatus(_ status: AppStatus) {

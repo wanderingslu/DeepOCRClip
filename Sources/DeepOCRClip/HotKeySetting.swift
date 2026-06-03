@@ -52,4 +52,10 @@ enum KeyCode {
         "5": 23, "0": 29, "O": 31, "U": 32, "I": 34, "P": 35, "L": 37,
         "J": 38, "K": 40, "N": 45, "M": 46, "7": 26, "8": 28, "9": 25
     ]
+
+    static let nameByCode: [UInt32: String] = Dictionary(uniqueKeysWithValues: lookup.map { ($0.value, $0.key) })
+
+    static func name(for keyCode: UInt32) -> String? {
+        nameByCode[keyCode]
+    }
 }

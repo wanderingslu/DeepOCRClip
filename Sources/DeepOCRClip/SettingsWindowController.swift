@@ -1,24 +1,17 @@
 import AppKit
-import Carbon
 
 final class SettingsWindowController: NSWindowController {
     private let settings: SettingsStore
     var onSave: (() -> Void)?
+    var onHotKeyChange: (() -> Void)?
 
     private let apiKeyField = NSSecureTextField()
     private let modelPopup = NSPopUpButton()
     private let correctionCheckbox = NSButton(checkboxWithTitle: "使用 DeepSeek 修正 OCR 结果", target: nil, action: nil)
     private let showResultCheckbox = NSButton(checkboxWithTitle: "识别完成后显示结果窗口", target: nil, action: nil)
-    private let captureCommandCheckbox = NSButton(checkboxWithTitle: "⌘", target: nil, action: nil)
-    private let captureControlCheckbox = NSButton(checkboxWithTitle: "⌃", target: nil, action: nil)
-    private let captureOptionCheckbox = NSButton(checkboxWithTitle: "⌥", target: nil, action: nil)
-    private let captureShiftCheckbox = NSButton(checkboxWithTitle: "⇧", target: nil, action: nil)
-    private let captureKeyPopup = NSPopUpButton()
-    private let showLastCommandCheckbox = NSButton(checkboxWithTitle: "⌘", target: nil, action: nil)
-    private let showLastControlCheckbox = NSButton(checkboxWithTitle: "⌃", target: nil, action: nil)
-    private let showLastOptionCheckbox = NSButton(checkboxWithTitle: "⌥", target: nil, action: nil)
-    private let showLastShiftCheckbox = NSButton(checkboxWithTitle: "⇧", target: nil, action: nil)
-    private let showLastKeyPopup = NSPopUpButton()
+    private let captureRecorder = HotKeyRecorderControl(setting: .defaultCapture)
+    private let showLastRecorder = HotKeyRecorderControl(setting: .defaultShowLastResult)
+    private let shortcutMessageLabel = NSTextField(labelWithString: "点击铅笔图标后，直接键入新的快捷键。")
 
     init(settings: SettingsStore) {
         self.settings = settings
@@ -55,12 +48,10 @@ final class SettingsWindowController: NSWindowController {
         window?.setContentSize(NSSize(width: 600, height: 400))
         apiKeyField.placeholderString = "sk-..."
         modelPopup.addItems(withTitles: SettingsStore.availableModels)
-        captureKeyPopup.addItems(withTitles: KeyCode.names)
-        showLastKeyPopup.addItems(withTitles: KeyCode.names)
+        configureShortcutRecorders()
 
-        let hotkeyLabel = NSTextField(labelWithString: "快捷键至少选择一个修饰键；翻译在结果窗口右下角点击。")
-        hotkeyLabel.textColor = .secondaryLabelColor
-        hotkeyLabel.font = .systemFont(ofSize: 12)
+        shortcutMessageLabel.textColor = .secondaryLabelColor
+        shortcutMessageLabel.font = .systemFont(ofSize: 12)
 
         let saveButton = NSButton(title: "保存", target: self, action: #selector(saveSettings))
         saveButton.bezelStyle = .rounded
@@ -69,20 +60,8 @@ final class SettingsWindowController: NSWindowController {
         let grid = NSGridView(views: [
             [label("DeepSeek API Key"), apiKeyField],
             [label("模型"), modelPopup],
-            [label("截图识别并复制"), hotKeyEditor(
-                command: captureCommandCheckbox,
-                control: captureControlCheckbox,
-                option: captureOptionCheckbox,
-                shift: captureShiftCheckbox,
-                keyPopup: captureKeyPopup
-            )],
-            [label("显示上次结果"), hotKeyEditor(
-                command: showLastCommandCheckbox,
-                control: showLastControlCheckbox,
-                option: showLastOptionCheckbox,
-                shift: showLastShiftCheckbox,
-                keyPopup: showLastKeyPopup
-            )]
+            [label("截图识别并复制"), captureRecorder],
+            [label("显示上次结果"), showLastRecorder]
         ])
         grid.translatesAutoresizingMaskIntoConstraints = false
         grid.column(at: 0).xPlacement = .trailing
@@ -94,7 +73,7 @@ final class SettingsWindowController: NSWindowController {
             grid,
             correctionCheckbox,
             showResultCheckbox,
-            hotkeyLabel,
+            shortcutMessageLabel,
             saveButton
         ])
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -125,20 +104,9 @@ final class SettingsWindowController: NSWindowController {
         modelPopup.selectItem(withTitle: settings.model)
         correctionCheckbox.state = settings.correctionEnabled ? .on : .off
         showResultCheckbox.state = settings.showResultWindow ? .on : .off
-        loadHotKey(settings.captureHotKey, into: (
-            captureCommandCheckbox,
-            captureControlCheckbox,
-            captureOptionCheckbox,
-            captureShiftCheckbox,
-            captureKeyPopup
-        ))
-        loadHotKey(settings.showLastHotKey, into: (
-            showLastCommandCheckbox,
-            showLastControlCheckbox,
-            showLastOptionCheckbox,
-            showLastShiftCheckbox,
-            showLastKeyPopup
-        ))
+        captureRecorder.setting = settings.captureHotKey
+        showLastRecorder.setting = settings.showLastHotKey
+        setShortcutMessage("点击铅笔图标后，直接键入新的快捷键。", isError: false)
     }
 
     @objc private func saveSettings() {
@@ -146,64 +114,45 @@ final class SettingsWindowController: NSWindowController {
         settings.model = modelPopup.titleOfSelectedItem ?? "deepseek-v4-flash"
         settings.correctionEnabled = correctionCheckbox.state == .on
         settings.showResultWindow = showResultCheckbox.state == .on
-        settings.captureHotKey = hotKeySetting(from: (
-            captureCommandCheckbox,
-            captureControlCheckbox,
-            captureOptionCheckbox,
-            captureShiftCheckbox,
-            captureKeyPopup
-        ), fallback: .defaultCapture)
-        settings.showLastHotKey = hotKeySetting(from: (
-            showLastCommandCheckbox,
-            showLastControlCheckbox,
-            showLastOptionCheckbox,
-            showLastShiftCheckbox,
-            showLastKeyPopup
-        ), fallback: .defaultShowLastResult)
+        settings.captureHotKey = captureRecorder.setting
+        settings.showLastHotKey = showLastRecorder.setting
         onSave?()
         window?.close()
     }
 
-    private func hotKeyEditor(
-        command: NSButton,
-        control: NSButton,
-        option: NSButton,
-        shift: NSButton,
-        keyPopup: NSPopUpButton
-    ) -> NSStackView {
-        let stack = NSStackView(views: [command, control, option, shift, keyPopup])
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 8
-        keyPopup.widthAnchor.constraint(equalToConstant: 76).isActive = true
-        return stack
+    private func configureShortcutRecorders() {
+        captureRecorder.validator = { [weak self] setting in
+            guard let self else { return nil }
+            return setting == self.showLastRecorder.setting ? "两个功能不能使用同一个快捷键" : nil
+        }
+        showLastRecorder.validator = { [weak self] setting in
+            guard let self else { return nil }
+            return setting == self.captureRecorder.setting ? "两个功能不能使用同一个快捷键" : nil
+        }
+
+        captureRecorder.onChange = { [weak self] setting in
+            guard let self else { return }
+            self.settings.captureHotKey = setting
+            self.onHotKeyChange?()
+            self.setShortcutMessage("截图快捷键已更新为 \(setting.displayString)", isError: false)
+        }
+        showLastRecorder.onChange = { [weak self] setting in
+            guard let self else { return }
+            self.settings.showLastHotKey = setting
+            self.onHotKeyChange?()
+            self.setShortcutMessage("显示上次结果快捷键已更新为 \(setting.displayString)", isError: false)
+        }
+
+        captureRecorder.onValidationError = { [weak self] message in
+            self?.setShortcutMessage(message, isError: true)
+        }
+        showLastRecorder.onValidationError = { [weak self] message in
+            self?.setShortcutMessage(message, isError: true)
+        }
     }
 
-    private func loadHotKey(
-        _ setting: HotKeySetting,
-        into controls: (NSButton, NSButton, NSButton, NSButton, NSPopUpButton)
-    ) {
-        controls.0.state = setting.modifiers & UInt32(cmdKey) != 0 ? .on : .off
-        controls.1.state = setting.modifiers & UInt32(controlKey) != 0 ? .on : .off
-        controls.2.state = setting.modifiers & UInt32(optionKey) != 0 ? .on : .off
-        controls.3.state = setting.modifiers & UInt32(shiftKey) != 0 ? .on : .off
-        controls.4.selectItem(withTitle: setting.keyName)
-    }
-
-    private func hotKeySetting(
-        from controls: (NSButton, NSButton, NSButton, NSButton, NSPopUpButton),
-        fallback: HotKeySetting
-    ) -> HotKeySetting {
-        let keyName = controls.4.titleOfSelectedItem ?? fallback.keyName
-        let keyCode = KeyCode.lookup[keyName] ?? fallback.keyCode
-        var modifiers: UInt32 = 0
-
-        if controls.0.state == .on { modifiers |= UInt32(cmdKey) }
-        if controls.1.state == .on { modifiers |= UInt32(controlKey) }
-        if controls.2.state == .on { modifiers |= UInt32(optionKey) }
-        if controls.3.state == .on { modifiers |= UInt32(shiftKey) }
-
-        let setting = HotKeySetting(keyCode: keyCode, modifiers: modifiers, keyName: keyName)
-        return setting.hasValidModifier ? setting : fallback
+    private func setShortcutMessage(_ message: String, isError: Bool) {
+        shortcutMessageLabel.stringValue = message
+        shortcutMessageLabel.textColor = isError ? .systemRed : .secondaryLabelColor
     }
 }
