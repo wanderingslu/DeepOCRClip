@@ -46,7 +46,10 @@ final class DeepSeekClient: @unchecked Sendable {
         }
 
         let system = """
-        Translate the user's English text into natural Simplified Chinese. Preserve paragraph structure where useful. Return only the Chinese translation. Do not explain.
+        Translate all non-Chinese text into natural Simplified Chinese.
+        Preserve any existing Chinese text exactly as written: do not polish, rewrite, summarize, or paraphrase it.
+        Preserve paragraph and structural line breaks where useful.
+        Return only the resulting text. Do not explain.
         """
 
         return try await sendChat(

@@ -16,7 +16,6 @@ APP_DIR="$ROOT_DIR/dist/DeepOCRClip.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
-ICONSET_DIR="$ROOT_DIR/.build/AppIcon.iconset"
 BUILD_DIR="$ROOT_DIR/.build/deepocrclip-$CONFIGURATION"
 DEFAULT_SIGNING_IDENTITY="DeepOCRClip Local Code Signing"
 SIGNING_IDENTITY="${DEEP_OCR_CODESIGN_IDENTITY:-}"
@@ -58,9 +57,7 @@ cp "$BUILD_DIR/DeepOCRClip" "$MACOS_DIR/DeepOCRClip"
 cp "$ROOT_DIR/Resources/Info.plist" "$CONTENTS_DIR/Info.plist"
 chmod +x "$MACOS_DIR/DeepOCRClip"
 
-rm -rf "$ICONSET_DIR"
-swift "$ROOT_DIR/scripts/generate_app_icon.swift" "$ICONSET_DIR"
-iconutil -c icns "$ICONSET_DIR" -o "$RESOURCES_DIR/AppIcon.icns"
+cp "$ROOT_DIR/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable DeepOCRClip" "$CONTENTS_DIR/Info.plist" >/dev/null
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.luruiyang.deepocrclip" "$CONTENTS_DIR/Info.plist" >/dev/null

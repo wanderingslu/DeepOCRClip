@@ -7,7 +7,7 @@ final class ResultWindowController: NSWindowController {
     private let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 560, height: 640))
     private let statusLabel = NSTextField(labelWithString: "准备就绪")
     private let copyButton = NSButton(title: "复制", target: nil, action: nil)
-    private let translateButton = NSButton(title: "翻译", target: nil, action: nil)
+    private let translateButton = NSButton(title: "翻中文", target: nil, action: nil)
 
     private var currentResult: RecognitionResult?
     private var showingTranslation = false
@@ -66,7 +66,7 @@ final class ResultWindowController: NSWindowController {
     func setTranslating(_ translating: Bool) {
         isTranslating = translating
         translateButton.isEnabled = !translating
-        translateButton.title = translating ? "翻译中..." : (showingTranslation ? "原文" : "翻译")
+        translateButton.title = translating ? "翻译中..." : (showingTranslation ? "原文" : "翻中文")
     }
 
     func applyTranslation(_ translation: String) {
@@ -251,7 +251,7 @@ final class ResultWindowController: NSWindowController {
     }
 
     private func updateTranslateButton() {
-        translateButton.title = showingTranslation ? "原文" : "翻译"
+        translateButton.title = showingTranslation ? "原文" : "翻中文"
         translateButton.isEnabled = !isTranslating
     }
 
@@ -274,6 +274,11 @@ final class ResultWindowController: NSWindowController {
         let sourceText = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !sourceText.isEmpty else {
             setStatus("没有可翻译的文本", isError: true)
+            return
+        }
+
+        guard TextLanguageDetector.containsForeignLetters(in: sourceText) else {
+            setStatus("内容已是中文，无需翻译", isError: false)
             return
         }
 

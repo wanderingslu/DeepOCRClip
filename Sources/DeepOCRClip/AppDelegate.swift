@@ -324,6 +324,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let apiKey = settings.apiKey
         let model = settings.model
 
+        guard TextLanguageDetector.containsForeignLetters(in: sourceText) else {
+            resultWindowController.setTranslating(false)
+            resultWindowController.setStatus("内容已是中文，无需翻译", isError: false)
+            return
+        }
+
         guard !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             resultWindowController.setTranslating(false)
             resultWindowController.setStatus("请先在设置中填写 DeepSeek API Key", isError: true)
