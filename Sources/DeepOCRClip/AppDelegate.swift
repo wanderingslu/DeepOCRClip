@@ -90,6 +90,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         resultWindowController.onTranslate = { [weak self] sourceText in
             self?.translateTextFromResultWindow(sourceText)
         }
+        resultWindowController.onResultChange = { [weak self] result in
+            self?.lastResult = result
+        }
     }
 
     private func configureSettingsCallbacks() {

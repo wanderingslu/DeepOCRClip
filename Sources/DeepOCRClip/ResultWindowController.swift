@@ -1,10 +1,11 @@
 import AppKit
 
-final class ResultWindowController: NSWindowController {
+final class ResultWindowController: NSWindowController, NSTextViewDelegate {
     var onTranslate: ((String) -> Void)?
+    var onResultChange: ((RecognitionResult) -> Void)?
 
     private let imageView = AspectFitImageView()
-    private let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 560, height: 640))
+    private let textView = EditableResultTextView(frame: NSRect(x: 0, y: 0, width: 560, height: 640))
     private let statusLabel = NSTextField(labelWithString: "准备就绪")
     private let copyButton = NSButton(title: "复制", target: nil, action: nil)
     private let translateButton = NSButton(title: "翻中文", target: nil, action: nil)
@@ -12,6 +13,7 @@ final class ResultWindowController: NSWindowController {
     private var currentResult: RecognitionResult?
     private var showingTranslation = false
     private var isTranslating = false
+    private var isSettingDisplayedText = false
     private var keyMonitor: Any?
 
     init() {
@@ -99,8 +101,10 @@ final class ResultWindowController: NSWindowController {
         rightPane.layer?.backgroundColor = NSColor.white.cgColor
 
         textView.isEditable = true
+        textView.isSelectable = true
         textView.isRichText = false
         textView.allowsUndo = true
+        textView.delegate = self
         textView.importsGraphics = false
         textView.drawsBackground = true
         textView.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
@@ -256,8 +260,15 @@ final class ResultWindowController: NSWindowController {
     }
 
     @objc private func copyText() {
-        ClipboardService.copy(textView.string)
-        setStatus("已复制到剪贴板", isError: false)
+        let selectedRange = textView.selectedRange()
+        if selectedRange.length > 0 {
+            let selectedText = (textView.string as NSString).substring(with: selectedRange)
+            ClipboardService.copy(selectedText)
+            setStatus("已复制选中文本", isError: false)
+        } else {
+            ClipboardService.copy(textView.string)
+            setStatus("已复制到剪贴板", isError: false)
+        }
     }
 
     @objc private func translateOrToggle() {
@@ -287,6 +298,9 @@ final class ResultWindowController: NSWindowController {
     }
 
     private func setDisplayedText(_ text: String) {
+        isSettingDisplayedText = true
+        defer { isSettingDisplayedText = false }
+
         let attributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: NSColor.black,
             .font: NSFont.systemFont(ofSize: 20, weight: .semibold),
@@ -306,6 +320,63 @@ final class ResultWindowController: NSWindowController {
         textView.enclosingScrollView?.documentView?.setFrameSize(
             NSSize(width: textView.enclosingScrollView?.contentSize.width ?? 560, height: max(usedHeight + 80, 640))
         )
+        textView.undoManager?.removeAllActions()
+    }
+
+    func textDidChange(_ notification: Notification) {
+        guard !isSettingDisplayedText,
+              var result = currentResult else {
+            return
+        }
+
+        if showingTranslation {
+            result.translatedText = textView.string
+        } else {
+            result.correctedText = textView.string
+        }
+        currentResult = result
+        onResultChange?(result)
+    }
+}
+
+private final class EditableResultTextView: NSTextView {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard let key = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+
+        switch (flags, key) {
+        case (.command, "z"):
+            undoManager?.undo()
+            return true
+        case ([.command, .shift], "z"):
+            undoManager?.redo()
+            return true
+        case (.command, "x"):
+            copySelectedText()
+            insertText("", replacementRange: selectedRange())
+            return true
+        case (.command, "c"):
+            copySelectedText()
+            return true
+        case (.command, "v"):
+            if let pastedText = NSPasteboard.general.string(forType: .string) {
+                insertText(pastedText, replacementRange: selectedRange())
+            }
+            return true
+        case (.command, "a"):
+            selectAll(nil)
+            return true
+        default:
+            return super.performKeyEquivalent(with: event)
+        }
+    }
+
+    private func copySelectedText() {
+        let range = selectedRange()
+        guard range.length > 0 else { return }
+        ClipboardService.copy((string as NSString).substring(with: range))
     }
 }
 
