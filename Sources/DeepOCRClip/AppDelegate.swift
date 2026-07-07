@@ -217,18 +217,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
 
                 do {
-                    let correctedText = try await deepSeekClient.correctOCRText(rawText, apiKey: apiKey, model: model)
+                    let correctedText = TextLayoutNormalizer.normalizeContinuousProse(
+                        try await deepSeekClient.correctOCRText(rawText, apiKey: apiKey, model: model)
+                    )
                     DiagnosticsLogger.log("deepseek correction completed: \(correctedText.count) chars")
                     let verdict = TextCorrectionValidator.validate(raw: rawText, corrected: correctedText)
                     guard verdict.accepted else {
                         DiagnosticsLogger.log("deepseek correction rejected: \(verdict.reason)")
                         DiagnosticsLogger.log("raw OCR snippet: \(TextCorrectionValidator.logSnippet(rawText))")
                         DiagnosticsLogger.log("deepseek candidate snippet: \(TextCorrectionValidator.logSnippet(correctedText))")
-                            await MainActor.run {
-                                self.isBusy = false
-                                self.setStatus(.info("DeepSeek 修正异常，已保留本地 OCR"))
-                                self.resultWindowController.setStatus("DeepSeek 修正异常，已保留本地 OCR", isError: false)
-                            }
+                        await MainActor.run {
+                            self.isBusy = false
+                            self.setStatus(.info("DeepSeek 修正异常，已保留本地 OCR"))
+                            self.resultWindowController.setStatus("DeepSeek 修正异常，已保留本地 OCR", isError: false)
+                        }
                         return
                     }
                     let correctedResult = RecognitionResult(

@@ -15,7 +15,7 @@ final class OCRService: @unchecked Sendable {
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
 
-        let preferredLanguages = ["zh-Hans", "zh-Hant", "en-US"]
+        let preferredLanguages = ["zh-Hans", "zh-Hant", "en-US", "el-GR"]
         if let supportedLanguages = try? request.supportedRecognitionLanguages() {
             let supportedPreferredLanguages = preferredLanguages.filter { supportedLanguages.contains($0) }
             if !supportedPreferredLanguages.isEmpty {

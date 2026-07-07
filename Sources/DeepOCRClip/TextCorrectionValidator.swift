@@ -10,19 +10,19 @@ enum TextCorrectionValidator {
         let rawText = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let correctedText = corrected.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            guard !correctedText.isEmpty else {
-                return Verdict(accepted: false, reason: "修正结果为空")
-            }
+        guard !correctedText.isEmpty else {
+            return Verdict(accepted: false, reason: "修正结果为空")
+        }
 
-            if looksLikeAssistantRefusal(raw: rawText, corrected: correctedText) {
-                return Verdict(accepted: false, reason: "修正结果是模型拒绝语或元回答")
-            }
+        if looksLikeAssistantRefusal(raw: rawText, corrected: correctedText) {
+            return Verdict(accepted: false, reason: "修正结果是模型拒绝语或元回答")
+        }
 
-            if looksLikeShortLabelExpansion(raw: rawText, corrected: correctedText) {
-                return Verdict(accepted: false, reason: "短文本从 \(meaningfulCharacterCount(in: rawText)) 字异常扩展到 \(meaningfulCharacterCount(in: correctedText)) 字")
-            }
+        if looksLikeShortLabelExpansion(raw: rawText, corrected: correctedText) {
+            return Verdict(accepted: false, reason: "短文本从 \(meaningfulCharacterCount(in: rawText)) 字异常扩展到 \(meaningfulCharacterCount(in: correctedText)) 字")
+        }
 
-            let rawCJK = cjkCharacterCount(in: rawText)
+        let rawCJK = preservableCJKCharacterCount(in: rawText)
         let correctedCJK = cjkCharacterCount(in: correctedText)
 
         if rawCJK >= 2 && correctedCJK == 0 {
@@ -62,73 +62,87 @@ enum TextCorrectionValidator {
         }
     }
 
-        private static func latinLetterCount(in text: String) -> Int {
+    private static func preservableCJKCharacterCount(in text: String) -> Int {
+        let rawLatin = latinLetterCount(in: text)
+        let lines = text.components(separatedBy: .newlines)
+        return lines.reduce(0) { total, line in
+            let cjk = cjkCharacterCount(in: line)
+            guard cjk > 0 else { return total }
+
+            let meaningful = meaningfulCharacterCount(in: line)
+            let latin = latinLetterCount(in: line)
+            let isLikelyInterfaceNoise = rawLatin >= 40 && meaningful <= 8 && latin == 0
+            return total + (isLikelyInterfaceNoise ? 0 : cjk)
+        }
+    }
+
+    private static func latinLetterCount(in text: String) -> Int {
         text.unicodeScalars.reduce(0) { count, scalar in
             let value = scalar.value
             let isUppercaseLatin = value >= 65 && value <= 90
             let isLowercaseLatin = value >= 97 && value <= 122
             return count + ((isUppercaseLatin || isLowercaseLatin) ? 1 : 0)
         }
+    }
+
+    private static func looksLikeAssistantRefusal(raw: String, corrected: String) -> Bool {
+        let rawNormalized = normalizedForPolicyCheck(raw)
+        let correctedNormalized = normalizedForPolicyCheck(corrected)
+
+        let metaRequests = [
+            "请提供需要修复的ocr文本",
+            "请提供ocr文本",
+            "provide the ocr text",
+            "provide ocr text"
+        ]
+        if metaRequests.contains(where: { correctedNormalized.contains($0) && !rawNormalized.contains($0) }) {
+            return true
         }
 
-        private static func looksLikeAssistantRefusal(raw: String, corrected: String) -> Bool {
-            let rawNormalized = normalizedForPolicyCheck(raw)
-            let correctedNormalized = normalizedForPolicyCheck(corrected)
+        let refusalPhrases = [
+            "无法处理这个请求",
+            "不能处理这个请求",
+            "无法协助",
+            "不能协助",
+            "无法提供",
+            "不能提供",
+            "i can't assist",
+            "i cannot assist",
+            "i'm unable",
+            "i am unable",
+            "sorry"
+        ]
+        let apologyPhrases = ["抱歉", "对不起", "sorry"]
+        let hasRefusal = refusalPhrases.contains { correctedNormalized.contains($0) && !rawNormalized.contains($0) }
+        let hasApology = apologyPhrases.contains { correctedNormalized.contains($0) && !rawNormalized.contains($0) }
+        return hasRefusal && (hasApology || correctedNormalized.contains("请求") || correctedNormalized.contains("request"))
+    }
 
-            let metaRequests = [
-                "请提供需要修复的ocr文本",
-                "请提供ocr文本",
-                "provide the ocr text",
-                "provide ocr text"
-            ]
-            if metaRequests.contains(where: { correctedNormalized.contains($0) && !rawNormalized.contains($0) }) {
-                return true
-            }
+    private static func looksLikeShortLabelExpansion(raw: String, corrected: String) -> Bool {
+        let rawCount = meaningfulCharacterCount(in: raw)
+        guard rawCount > 0 && rawCount <= 12 else { return false }
 
-            let refusalPhrases = [
-                "无法处理这个请求",
-                "不能处理这个请求",
-                "无法协助",
-                "不能协助",
-                "无法提供",
-                "不能提供",
-                "i can't assist",
-                "i cannot assist",
-                "i'm unable",
-                "i am unable",
-                "sorry"
-            ]
-            let apologyPhrases = ["抱歉", "对不起", "sorry"]
-            let hasRefusal = refusalPhrases.contains { correctedNormalized.contains($0) && !rawNormalized.contains($0) }
-            let hasApology = apologyPhrases.contains { correctedNormalized.contains($0) && !rawNormalized.contains($0) }
-            return hasRefusal && (hasApology || correctedNormalized.contains("请求") || correctedNormalized.contains("request"))
+        let correctedCount = meaningfulCharacterCount(in: corrected)
+        let allowedCount = max(rawCount + 8, rawCount * 2)
+        return correctedCount > allowedCount
+    }
+
+    private static func meaningfulCharacterCount(in text: String) -> Int {
+        text.unicodeScalars.reduce(0) { count, scalar in
+            count + (CharacterSet.whitespacesAndNewlines.contains(scalar) || CharacterSet.punctuationCharacters.contains(scalar) ? 0 : 1)
         }
+    }
 
-        private static func looksLikeShortLabelExpansion(raw: String, corrected: String) -> Bool {
-            let rawCount = meaningfulCharacterCount(in: raw)
-            guard rawCount > 0 && rawCount <= 12 else { return false }
+    private static func normalizedForPolicyCheck(_ text: String) -> String {
+        text
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "\n", with: "")
+            .replacingOccurrences(of: "\r", with: "")
+            .replacingOccurrences(of: "\t", with: "")
+    }
 
-            let correctedCount = meaningfulCharacterCount(in: corrected)
-            let allowedCount = max(rawCount + 8, rawCount * 2)
-            return correctedCount > allowedCount
-        }
-
-        private static func meaningfulCharacterCount(in text: String) -> Int {
-            text.unicodeScalars.reduce(0) { count, scalar in
-                count + (CharacterSet.whitespacesAndNewlines.contains(scalar) || CharacterSet.punctuationCharacters.contains(scalar) ? 0 : 1)
-            }
-        }
-
-        private static func normalizedForPolicyCheck(_ text: String) -> String {
-            text
-                .lowercased()
-                .replacingOccurrences(of: " ", with: "")
-                .replacingOccurrences(of: "\n", with: "")
-                .replacingOccurrences(of: "\r", with: "")
-                .replacingOccurrences(of: "\t", with: "")
-        }
-
-        private static func isCJK(_ scalar: Unicode.Scalar) -> Bool {
+    private static func isCJK(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.value {
         case 0x3400...0x4DBF,
              0x4E00...0x9FFF,
