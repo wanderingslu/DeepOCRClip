@@ -1,51 +1,120 @@
 # DeepOCRClip
 
-DeepOCRClip is a lightweight native macOS menu bar OCR app.
+DeepOCRClip is a lightweight native macOS menu bar OCR app. It captures a
+selected screen region, recognizes text locally, optionally repairs OCR
+artifacts with DeepSeek, and copies the result to the clipboard.
 
-It captures a selected screen region, recognizes Simplified Chinese, Traditional Chinese, and English locally with Apple's Vision framework, optionally repairs OCR spacing and hyphenation with DeepSeek V4, and copies the result to the clipboard.
+The app supports Simplified Chinese, Traditional Chinese, and English through
+Apple Vision. Tall, narrow vertical text falls back to macOS Live Text through
+VisionKit.
 
-## Hotkeys
+## Download
 
-- `Option+Shift+C`: screenshot OCR, correct, copy.
-- `Option+Shift+L`: show the last result window.
+Download the packaged universal app from
+[GitHub Releases](https://github.com/wanderingslu/DeepOCRClip/releases/latest).
+The app contains both Apple Silicon (`arm64`) and Intel (`x86_64`) code.
 
-Both shortcuts can be changed in Settings. Translation is available from the `翻译` button in the result window.
+The current package is locally signed rather than Apple-notarized. On first
+launch, macOS may require opening it from Finder with Control-click > Open.
+Screenshot capture also requires Screen Recording permission for
+`DeepOCRClip`.
 
-## Build
+## Use
+
+- Default screenshot OCR shortcut: `Option+Shift+C`
+- Default show-last-result shortcut: `Option+Shift+L`
+- Both shortcuts can be changed in Settings.
+- The result window supports editing, selection, copy, undo, and `Command+W`.
+- Use `翻中文` to translate foreign-language text into Simplified Chinese.
+
+Configure a DeepSeek API key in Settings to enable OCR repair and translation.
+Without an API key, local OCR and clipboard copy still work.
+
+## Give This Project to Codex
+
+This repository is public and contains the complete source and packaging
+scripts:
+
+```text
+https://github.com/wanderingslu/DeepOCRClip
+```
+
+A useful prompt for Codex is:
+
+```text
+Clone and inspect https://github.com/wanderingslu/DeepOCRClip.
+Read AGENTS.md before making changes. Implement my requested change,
+run the relevant OCR regression checks, and verify both arm64 and x86_64
+release builds. Do not change the bundle identifier or signing identity.
+```
+
+Codex can then clone the project:
+
+```bash
+git clone https://github.com/wanderingslu/DeepOCRClip.git
+cd DeepOCRClip
+```
+
+## Build from Source
+
+Requirements:
+
+- macOS 13 or later
+- Xcode Command Line Tools
+- Swift 6-compatible toolchain
+
+Create the stable local signing identity once, then build the universal app:
 
 ```bash
 ./scripts/create_signing_identity.sh
 ./scripts/build_app.sh release
 ```
 
-The packaged universal app (`x86_64` + `arm64`) is written to `dist/DeepOCRClip.app`.
-
-## Install
+The result is written to `dist/DeepOCRClip.app`. To build and install it:
 
 ```bash
 ./scripts/install_app.sh
 ```
 
-This builds a release app and installs it to `/Applications/DeepOCRClip.app`.
-You can then start it by double-clicking the app, or keep using the helper launcher:
-
-```bash
-./scripts/run_app.sh
-```
-
-Diagnostics are written to `~/Library/Logs/DeepOCRClip.log`.
-
-## DMG
+To create a distributable DMG:
 
 ```bash
 ./scripts/build_dmg.sh
 ```
 
-The DMG contains the universal app and is written to `dist/DeepOCRClip-<version>.dmg`.
+The DMG is written to `dist/DeepOCRClip-<version>.dmg`.
 
-## Notes
+## Verification
 
-- Configure the DeepSeek API key from the app's settings menu.
-- Without an API key, local OCR still works and copies raw OCR text.
-- Screenshot capture requires macOS Screen Recording permission for `DeepOCRClip`.
-- For stable macOS permission behavior across rebuilds, run `./scripts/create_signing_identity.sh` once before packaging.
+Run local OCR against a supplied image without starting the menu bar UI:
+
+```bash
+dist/DeepOCRClip.app/Contents/MacOS/DeepOCRClip \
+  --ocr-image /absolute/path/to/sample.png
+```
+
+Verify the universal binary:
+
+```bash
+lipo -info dist/DeepOCRClip.app/Contents/MacOS/DeepOCRClip
+```
+
+Diagnostics from the normal app are written to:
+
+```text
+~/Library/Logs/DeepOCRClip.log
+```
+
+## Permission and Signing Notes
+
+- Keep the bundle identifier `com.luruiyang.deepocrclip` stable. Changing it
+  creates a new Screen Recording permission identity.
+- Keep using the same `DeepOCRClip Local Code Signing` certificate on a
+  developer machine to avoid repeated local permission prompts.
+- `scripts/reset_screen_permission.sh` resets Screen Recording permission when
+  a stale TCC entry must be cleared.
+- Never commit a DeepSeek API key, `Secrets.plist`, an app bundle, DMG, or build
+  directory.
+
+See [AGENTS.md](AGENTS.md) for architecture and agent-specific development
+guidance.
